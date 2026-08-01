@@ -1,0 +1,18 @@
+{
+	"extension": {
+		"version": "0.8.2026020401",
+		"json": 2
+	},
+	"project": {
+		"name": "T1RedLeftV3",
+		"description": "",
+		"creationDate": "7/25/2026, 9:49:53 AM",
+		"platform": "V5",
+		"language": "python",
+		"slot": 3,
+		"sdkVersion": "V5_1_0_1_25",
+		"python": {
+			"main": "src/main.py"
+		}
+	}
+}
