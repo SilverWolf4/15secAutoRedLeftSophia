@@ -51,7 +51,7 @@ extensionR = Motor(Ports.PORT6, GearSetting.RATIO_36_1, False) # right extension
 inertialSensor     = Inertial(Ports.PORT7)
 trackingWheelVert  = Rotation(Ports.PORT4, True)  # vertical tracking wheel  (forward/back)
 trackingWheelHoriz = Rotation(Ports.PORT17, True)   # horizontal tracking wheel (strafe)
-distVert  = Distance(Ports.PORT12)  # vertical-facing distance sensor
+distVert  = Distance(Ports.PORT18)  # vertical-facing distance sensor
 distHoriz = Distance(Ports.PORT20)   # horizontal-facing distance sensor
 
 # ---- Pneumatics ----
@@ -619,7 +619,7 @@ def read_dist_mm_filtered(sensor, samples=3, sample_delay_ms=0,
 
 def finalize_to_front_wall(
     target_mm,
-    timeout_ms=700,
+    timeout_ms=1500,
     kp=0.05,
     ki=0.0,
     kd=0.03,
@@ -777,7 +777,6 @@ def onauton_autonomous_0():
     """
     #set stopping to hold for stablility
     #end
-    clawRotationMotor.spin_to_position(30)
     #starting position is at a 30 deg angle offset to meet requirements
     #turn -30 degrees to face toggle wall
     r_offset=0
@@ -841,11 +840,11 @@ def onauton_autonomous_0():
 
     #reset rotation to zero as robot is alligned with wall.
     inertialSensor.set_rotation(0, DEGREES)
-
+    clawRotationMotor.spin_to_position(45, wait=False)
     #go away from wall to start scoring route
-    Time_wait   = 350   # loop iteration timeout
+    Time_wait   = 400   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 15.75     # target distance (inches)
+    f           = 14.75     # target distance (inches)
     r           = 0      # target heading (degrees)
     v_min       = 50     # ramp-up speed cap (%)
     v_max       = 70     # cruise speed cap (%)
@@ -856,8 +855,7 @@ def onauton_autonomous_0():
     extension_move_to_position(0.3,50)
     clawRotationMotor.set_velocity(100)
 
-    # clawRotationMotor.spin_to_position(120)
-    clawRotationMotor.spin_to_position(40)
+    clawRotationMotor.spin_to_position(45)
     clawRotationMotor.set_stopping(HOLD)
     #raise arm to score preload
     # extension_move_to_position(0.3,100)
@@ -889,18 +887,18 @@ def onauton_autonomous_0():
                            Kp_linear, Kp_rotation)
 
     #use distance sensor to allign with loader vertically to score preload
-    finalize_to_front_wall(90)
+    finalize_to_front_wall(80)
     extension_move_to_position(0,100)
     
     #scoring preload
-    wait(0.1,SECONDS)
+    wait(0.2,SECONDS)
     clawOpen.set(True)
     # wait(0.1,SECONDS)
 
     #back up from red goal after scoring preload
     Time_wait   = 300   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = -6.75     # target distance (inches)
+    f           = -6.3     # target distance (inches)
     r           = 90      # target heading (degrees)
     v_min       = 50     # ramp-up speed cap (%)
     v_max       = 70     # cruise speed cap (%)
@@ -908,48 +906,52 @@ def onauton_autonomous_0():
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
-    # turn to the cone + pin on the wall
-    Time_wait   = 200   # loop iteration timeout
+    clawRotationMotor.spin_to_position(40, wait=False)
+    clawOpen.set(True)
+    extension_move_to_position(0.1,100)
+    # turn to and drive to the cone + pin on the wall (combined turn+drive,
+    # was two separate moves -- merged to cut the standalone turn's settle time)
+    Time_wait   = 800   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 0     # target distance (inches)
+    f           = 20.5     # target distance (inches)
     # r           = 133      # target heading (degrees)
-    r           = 140      # target heading (degrees)
-    v_min       = 50     # ramp-up speed cap (%)
-    v_max       = 70     # cruise speed cap (%)
+    r           = 142      # target heading (degrees)
+    v_min       = 10     # ramp-up speed cap (%)
+    v_max       = 15     # cruise speed cap (%)
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation,
                            settle_error_heading=0.09, settle_loops=2)
-    clawRotationMotor.spin_to_position(30)
-    clawOpen.set(True)
-        # turn to the cone + pin on the wall
-    Time_wait   = 400   # loop iteration timeout
+    wait(0.1,SECONDS)
+    # Time_wait   = 200   # loop iteration timeout
+    # export_flag = 0      # 1 = print debug telemetry
+    # f           = 12     # target distance (inches)
+    # # r           = 133      # target heading (degrees)
+    # r           = 146      # target heading (degrees)
+    # v_min       = 10     # ramp-up speed cap (%)
+    # v_max       = 20     # cruise speed cap (%)
+    # Kp_linear   = 4
+    # Kp_rotation = 30
+    # autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+    #                        Kp_linear, Kp_rotation,
+    #                        settle_error_heading=0.09, settle_loops=2)
+    clawOpen.set(False)
+    wait(0.1,SECONDS)
+
+    extension_move_to_position(0.7,100)
+    clawRotationMotor.spin_to_position(30, wait=False)
+    # clawRotationMotor.spin_to_position(40, wait=False)
+    Time_wait   = 350   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 24     # target distance (inches)
-    # r           = 133      # target heading (degrees)
-    r           = 140      # target heading (degrees)
-    v_min       = 10     # ramp-up speed cap (%)
+    f           = -18.25     # target distance (inches)
+    r           = 137      # target heading (degrees)
+    v_min       = 20     # ramp-up speed cap (%)
     v_max       = 30     # cruise speed cap (%)
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
-    wait(0.1,SECONDS)
-    clawOpen.set(False)
-    # wait(0.1,SECONDS)
-    extension_move_to_position(0.8,100)
-    clawRotationMotor.spin_to_position(40)
-    Time_wait   = 350   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = -18.25     # target distance (inches)
-    r           = 140      # target heading (degrees)
-    v_min       = 20     # ramp-up speed cap (%)
-    v_max       = 40     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
     Time_wait   = 200   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
     f           = 0     # target distance (inches)
@@ -961,22 +963,26 @@ def onauton_autonomous_0():
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation,
                            settle_error_heading=0.09, settle_loops=2)
+    # extension_move_to_position(0.8,100)
     Time_wait   = 150   # loop iteration timeout (drives into wall on purpose, will always time out)
     export_flag = 0      # 1 = print debug telemetry
     f           = 8     # target distance (inches)
     r           = 90      # target heading (degrees)
-    v_min       = 40     # ramp-up speed cap (%)
-    v_max       = 60     # cruise speed cap (%)
+    v_min       = 20     # ramp-up speed cap (%)
+    v_max       = 30     # cruise speed cap (%)
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
-    finalize_to_front_wall(80)
+    finalize_to_front_wall(100)
+    wait(0.1,SECONDS)
+    clawRotationMotor.spin_to_position(60, wait=False)
     extension_move_to_position(0,100)
+    wait(0.1,SECONDS)
     # extension_move_to_position(0.3,100)
 
     #scoring pin + cone
-    wait(0.1,SECONDS)
+    # wait(0.1,SECONDS)
     clawOpen.set(True)
     # wait(0.2,SECONDS)    
     return
