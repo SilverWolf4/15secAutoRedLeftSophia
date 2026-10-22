@@ -35,23 +35,23 @@ wheelFactor = pi * 3.25 *3/4
 # reversed=True  means the motor's positive direction spins the wheel forward
 motorFL = Motor(Ports.PORT10, GearSetting.RATIO_6_1, True)   # front-left
 motorFR = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)  # front-right
-motorBL = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # back-left
+motorBL = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # back-left
 motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
-motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)  # mid-left 
+motorML = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)  # mid-left 
 motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)   # mid-right
 
-clawRotationMotor = Motor(Ports.PORT11, GearSetting.RATIO_18_1, True) #claw rotation motor
+#clawRotationMotor = Motor(Ports.PORT11, GearSetting.RATIO_18_1, True) #claw rotation motor
 clawOpen = DigitalOut(brain.three_wire_port.a)#open and close claw
 clawTurn = DigitalOut(brain.three_wire_port.b) #turn claw 180 degrees
 
-extensionL = Motor(Ports.PORT5, GearSetting.RATIO_36_1, True)   # left extension motor
-extensionR = Motor(Ports.PORT6, GearSetting.RATIO_36_1, False) # right extension motor
+extensionL = Motor(Ports.PORT4, GearSetting.RATIO_18_1, False)   # left extension motor
+extensionR = Motor(Ports.PORT6, GearSetting.RATIO_18_1, True) # right extension motor
 
 # ---- Sensors ----
 inertialSensor     = Inertial(Ports.PORT7)
-trackingWheelVert  = Rotation(Ports.PORT4, True)  # vertical tracking wheel  (forward/back)
+trackingWheelVert  = Rotation(Ports.PORT11, False)  # vertical tracking wheel  (forward/back)
 trackingWheelHoriz = Rotation(Ports.PORT17, True)   # horizontal tracking wheel (strafe)
-distVert  = Distance(Ports.PORT18)  # vertical-facing distance sensor
+distVert  = Distance(Ports.PORT13)  # vertical-facing distance sensor
 distHoriz = Distance(Ports.PORT20)   # horizontal-facing distance sensor
 
 # ---- Pneumatics ----
@@ -73,6 +73,49 @@ AI_clamp = AiVision(Ports.PORT15, AiVision.ALL_AIOBJS)
 # ============================================================
 # MOTOR HELPERS
 # ============================================================
+def print_all_motor_temps():
+    """Print the temperature of all drive motors."""
+    print("Motor Temperatures:")
+    for m in [motorFL, motorFR, motorBL, motorBR, motorML, motorMR,extensionL,extensionR]:
+        print(m,":", m.temperature())
+
+def test_drivetrain_configs():
+    """Print the current motor configuration for each drive motor."""
+    print("Motor Configurations:")
+    for m in [motorFL, motorFR, motorBL, motorBR, motorML, motorMR]:
+        m.spin(FORWARD)
+        wait(1,SECONDS)
+        m.stop()
+
+def test_extension_motors():
+    """Test the extension motors by spinning them forward and backward."""
+    extensionL.set_stopping(HOLD)
+    extensionR.set_stopping(HOLD)
+
+    print("Testing extension motors...")
+    extensionL.spin(FORWARD, 50, PERCENT)
+    extensionR.spin(FORWARD, 50, PERCENT)
+    wait(2, SECONDS)
+    extensionL.stop()
+    extensionR.stop()
+
+    wait(1, SECONDS)
+
+    extensionL.spin(REVERSE, 50, PERCENT)
+    extensionR.spin(REVERSE, 50, PERCENT)
+    wait(2, SECONDS)
+    extensionL.stop()
+    extensionR.stop()
+
+def dist_sensor_pin_ground(distance):
+    extension_move_to_position(0.2,100)
+    clawOpen.set(True)
+    wait(0.1,SECONDS)
+    finalize_to_front_wall(distance, timeout_ms=2000, kp=0.05, ki=0.0, kd=0.1,min_speed_pct=10.0, max_speed_pct=20.0, settle_loops=8, tolerance_mm=5.0)
+    print("first cup pin distance sensor reading: ", distVert.object_distance(MM))
+    clawOpen.set(False)
+    extension_move_to_position(0.4,100)
+    
 def extension_move(time_seconds,velocity):
     extensionL.set_stopping(HOLD)
     extensionR.set_stopping(HOLD)
@@ -88,26 +131,26 @@ def extension_move_to_position(target_position_turns, velocity, waitCon=False):
     """Move the extension motors to a specific position (in degrees) at a given velocity."""
     extensionL.set_stopping(HOLD)
     extensionR.set_stopping(HOLD)
-    extensionL.set_velocity(velocity, PERCENT)
-    extensionR.set_velocity(velocity, PERCENT)
+    extensionL.set_velocity(velocity, VelocityUnits.PERCENT)
+    extensionR.set_velocity(velocity, VelocityUnits.PERCENT)
     extensionL.spin_to_position(target_position_turns, TURNS, wait=False)
     extensionR.spin_to_position(target_position_turns, TURNS, wait=waitCon)
 
 def claw_go_to_front(degrees):
     #make sure that robot is in starting position before this (inspection position)
-    # clawOpen.set(False)
-    clawRotationMotor.set_velocity(60,PERCENT)
-    clawRotationMotor.set_stopping(HOLD)
-    clawRotationMotor.spin_to_position(degrees, DEGREES, wait=True)#220 working as of 8/17/26
+    clawOpen.set(False)
+    # clawRotationMotor.set_velocity(60,VelocityUnits.PERCENT)
+    # clawRotationMotor.set_stopping(HOLD)
+    # clawRotationMotor.spin_to_position(degrees, DEGREES, wait=True)#220 working as of 8/17/26
 
 def claw_go_to_back():
     #make sure that robot is in starting position before this (inspection position)
     clawTurn.set(False)
     clawOpen.set(False)
     
-    clawRotationMotor.set_velocity(60,PERCENT)
-    clawRotationMotor.set_stopping(HOLD)
-    clawRotationMotor.spin_to_position(0, DEGREES, wait=False)
+    # clawRotationMotor.set_velocity(60,PERCENT)
+    # clawRotationMotor.set_stopping(HOLD)
+    # clawRotationMotor.spin_to_position(0, DEGREES, wait=False)
     wait(0.3,SECONDS)
     
 def motor_Stop():
@@ -293,12 +336,6 @@ def autonomousPID(
                      + KiRotation * headingIntegral
                      + KdRotation * headingDerivative)
 
-        # Pure in-place rotation (target[0]==0): ignore the linear term entirely.
-        # Otherwise encoder drift picked up while spinning in place feeds back
-        # into xOutput and fights the turn, preventing it from ever settling.
-        if abs(target[0]) < 0.001:
-            xOutput = 0.0
-
         # 4. Heading guard: if heading error is large, reduce forward output
         #    so the robot straightens out before accelerating forward.
         heading_error_deg = error[1] * 180.0 / pi
@@ -459,9 +496,6 @@ def autonomousPIDTracking(
 
     tw_factor = tracking_wheel_factor if tracking_wheel_factor is not None else wheelFactor
 
-    if previousError is None:
-        previousError = [0.0, 0.0]
-
     Kp = Kp_l;  Ki = 0.0
     KpRotation = Kp_r;  KiRotation = 0.0
     Kd = 0.0;   KdRotation = 0.5  # increase if overshoot is a problem (prev 0)
@@ -471,10 +505,20 @@ def autonomousPIDTracking(
     integral        = 0.0
     headingIntegral = 0.0
 
+    # Seed previousError with the starting error so the first loop's
+    # derivative isn't a huge spike (was a ~157% kick on a 90 deg turn).
+    if previousError is None:
+        previousError = [target[0] - currentPosition[0], target[1] - currentPosition[1]]
+
     dt             = 0.005
     counter        = 0
     settle_counter = 0
-    HEADING_GUARD_DEG = heading_guard_deg
+    headingDerivative = 0.0   # low-pass filtered heading derivative
+    prevX          = 0.0      # last forward output, for slew limiting
+    SLEW           = 4.0      # max forward % change per loop → 0 to 100% in ~125 ms
+    # Pure turn (target distance 0): the tracking wheel rolls while spinning,
+    # so ignore it — no forward drive and no distance settle check.
+    pure_turn      = abs(target[0]) < 0.001
 
     while True:
         error[0] = target[0] - currentPosition[0]
@@ -483,26 +527,26 @@ def autonomousPIDTracking(
         integral        += error[0] * dt
         headingIntegral += error[1] * dt
         derivative        = (error[0] - previousError[0]) / dt
-        headingDerivative = (error[1] - previousError[1]) / dt
+        # IMU updates ~every 10 ms but the loop runs every 5 ms, so the raw
+        # derivative alternates between 0 and double; filter it to stop chatter.
+        raw_hd = (error[1] - previousError[1]) / dt
+        headingDerivative = 0.7 * headingDerivative + 0.3 * raw_hd
 
         xOutput   = (Kp * error[0]) + (Ki * integral) + (Kd * derivative)
         turnSpeed = (KpRotation * error[1]
                      + KiRotation * headingIntegral
                      + KdRotation * headingDerivative)
 
-        # Pure in-place rotation (target[0]==0): ignore the linear term entirely.
-        # Otherwise phantom distance picked up by the offset tracking wheel while
-        # spinning in place feeds back into xOutput and fights the turn, which
-        # keeps regenerating error[0] and prevents the move from ever settling.
-        if abs(target[0]) < 0.001:
+        # Heading guard: scale forward by cos(heading error). Almost no effect
+        # for small errors, smoothly cuts forward speed for large ones.
+        xOutput *= max(0.0, math.cos(error[1]))
+        if pure_turn:
             xOutput = 0.0
 
-        heading_error_deg = error[1] * 180.0 / pi
-        abs_head_err = abs(heading_error_deg)
-        if HEADING_GUARD_DEG > 0 and abs_head_err > HEADING_GUARD_DEG:
-            scale = HEADING_GUARD_DEG / abs_head_err
-            scale = max(heading_guard_floor, min(1.0, scale))
-            xOutput *= scale
+        # Slew limit: cap acceleration only, braking is unrestricted.
+        if abs(xOutput) > abs(prevX):
+            xOutput = max(prevX - SLEW, min(prevX + SLEW, xOutput))
+        prevX = xOutput
 
         motorFLSpeed = xOutput + turnSpeed; motorFRSpeed = xOutput - turnSpeed
         motorMLSpeed = xOutput + turnSpeed; motorMRSpeed = xOutput - turnSpeed
@@ -556,7 +600,8 @@ def autonomousPIDTracking(
                     enc_heading_deg]
             combine += [data_export]
 
-        if abs(error[0]) < settle_error_dist and abs(error[1]) < settle_error_heading:
+        dist_ok = pure_turn or abs(error[0]) < settle_error_dist
+        if dist_ok and abs(error[1]) < settle_error_heading:
             settle_counter += 1
         else:
             settle_counter = 0
@@ -597,13 +642,11 @@ def read_dist_mm_filtered(sensor, samples=3, sample_delay_ms=0,
     Taking a median over several samples filters out single-point spikes
     that can occur when the sensor sees the edge of an object or glare.
     If no valid reading is obtained (all out of [min_mm, max_mm]),
-    `fallback` is returned instead (default None, meaning "no trustworthy
-    reading" -- callers must handle that rather than treating it as a
-    real distance).
+    the fallback value is returned instead (or max_mm if fallback is None).
     """
     values = []
     for _ in range(max(1, samples)):
-        mm = sensor.object_distance(MM)
+        mm = distVert.object_distance(MM)
         if min_mm <= mm <= max_mm:
             values.append(mm)
         if sample_delay_ms > 0:
@@ -614,24 +657,22 @@ def read_dist_mm_filtered(sensor, samples=3, sample_delay_ms=0,
         mid = len(values) // 2
         return values[mid] if len(values) % 2 == 1 else (values[mid - 1] + values[mid]) / 2.0
 
-    return fallback
+    return fallback if fallback is not None else max_mm
 
 
 def finalize_to_front_wall(
     target_mm,
-    timeout_ms=1500,
+    timeout_ms=2500,
     kp=0.05,
     ki=0.0,
     kd=0.03,
     max_speed_pct=10.0,
-    min_speed_pct=3.0,
-    tolerance_mm=8.0,
+    min_speed_pct=5.0,
+    tolerance_mm=5.0,
     settle_loops=8,
     control_period_ms=5,
     sensor_period_ms=20,
     integral_limit=6000.0,
-    min_mm=20,
-    max_mm=500,
 ):
     """Creep the robot forward or backward until it is exactly target_mm
     from the front wall, using a PID loop driven by distVert.
@@ -644,19 +685,6 @@ def finalize_to_front_wall(
     sensor needs time between reads; the derivative term only updates when
     a fresh sensor reading is available.
 
-    min_mm/max_mm bound which readings are trusted. max_mm is kept well
-    under the sensor's full 2000mm range because this is only ever called
-    at close range (after an approach move) -- a reading anywhere near the
-    far end almost always means the sensor missed a thin/round target (e.g.
-    a mobile goal pole) and is instead seeing the field wall behind it, not
-    that the target is genuinely far away.
-
-    If no trustworthy reading is available (readings out of range, e.g. the
-    robot is already touching the target and below the sensor's ~20mm
-    minimum), the robot holds its current position instead of guessing --
-    driving on a fabricated distance is how it used to ram straight through
-    the target.
-
     Returns the final distance error (mm) relative to target_mm.
     """
     dt           = control_period_ms / 1000.0
@@ -664,9 +692,7 @@ def finalize_to_front_wall(
     settle_count = 0
     start_ms       = brain.timer.time(MSEC)
     last_sensor_ms = start_ms - sensor_period_ms
-    last_dist      = read_dist_mm_filtered(distVert, min_mm=min_mm, max_mm=max_mm)
-    if last_dist is None:
-        last_dist = target_mm   # no trustworthy reading yet -- assume settled, don't drive blind
+    last_dist      = read_dist_mm_filtered(distVert)
     last_error     = last_dist - target_mm
 
     while (brain.timer.time(MSEC) - start_ms) < timeout_ms:
@@ -675,10 +701,8 @@ def finalize_to_front_wall(
         # Only poll the sensor every sensor_period_ms to avoid noisy readings
         sensor_updated = False
         if (loop_start_ms - last_sensor_ms) >= sensor_period_ms:
-            fresh = read_dist_mm_filtered(distVert, min_mm=min_mm, max_mm=max_mm)
-            if fresh is not None:
-                last_dist = fresh
-                sensor_updated = True
+            last_dist = read_dist_mm_filtered(distVert, fallback=last_dist)
+            sensor_updated = True
             last_sensor_ms = loop_start_ms
 
         error = last_dist - target_mm
@@ -717,10 +741,6 @@ def finalize_to_front_wall(
             wait(remaining_ms, MSEC)
 
     motor_Stop()
-    elapsed_ms = brain.timer.time(MSEC) - start_ms
-    settled = settle_count >= settle_loops
-    print("finalize_to_front_wall: {} after {}ms, error={:.1f}mm".format(
-        "settled" if settled else "TIMED OUT", elapsed_ms, last_dist - target_mm))
     return last_dist - target_mm
 
 
@@ -772,112 +792,114 @@ def vexcode_auton_function():
 
 
 def onauton_autonomous_0():
+
+    #test_drivetrain_configs()
+    #test_extension_motors()
+
+
     global combine
     """Main autonomous routine.
     """
-    #set stopping to hold for stablility
-    #end
+
     #starting position is at a 30 deg angle offset to meet requirements
     #turn -30 degrees to face toggle wall
+    extension_move_to_position(0.3,100)
     r_offset=0
     Time_wait   = 70   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
     f           = 0     # target distance (inches)
-    r           = -30      # target heading (degrees)
-    v_min       = 60     # ramp-up speed cap (%)
+    r           = -40      # target heading (degrees)
+    v_min       = 100     # ramp-up speed cap (%)
+    v_max       = 60     # cruise speed cap (%)
+    Kp_linear   = 5
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+
+    #fwd momentum  
+    # Time_wait   = 100   # loop iteration timeout
+    # export_flag = 0      # 1 = print debug telemetry
+    # f           = 3     # target distance (inches)
+    # r           = -30      # target heading (degrees)
+    # v_min       = 80     # ramp-up speed cap (%)
+    # v_max       = 60     # cruise speed cap (%)
+    # Kp_linear   = 4
+    # Kp_rotation = 30
+    # autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+    #                        Kp_linear, Kp_rotation)
+
+    #bump into wall to flip toggle for the first time    
+    Time_wait   = 80   # loop iteration timeout
+    export_flag = 0      # 1 = print debug telemetry
+    f           = -15     # target distance (inches)
+    r           = -40      # target heading (degrees)
+    v_min       = 100     # ramp-up speed cap (%)
+    v_max       = 60     # cruise speed cap (%)
+    Kp_linear   = 5
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+
+    #go forward, away from the toggle
+    Time_wait   = 130   # loop iteration timeout
+    export_flag = 0      # 1 = print debug telemetry
+    f           = 3     # target distance (inches)
+    r           = -40      # target heading (degrees)
+    v_min       = 100     # ramp-up speed cap (%)
+    v_max       = 50     # cruise speed cap (%)
+    Kp_linear   = 5
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+
+    #flip toggle for the second time  
+    Time_wait   = 70   # loop iteration timeout
+    export_flag = 0      # 1 = print debug telemetry
+    f           = -15     # target distance (inches)
+    r           = -40      # target heading (degrees)
+    v_min       = 100     # ramp-up speed cap (%)
     v_max       = 60     # cruise speed cap (%)
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
 
-    
-    #bump into wall to flip toggle for the first time    
-    Time_wait   = 50   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = 5     # target distance (inches)
-    r           = -30      # target heading (degrees)
-    v_min       = 100     # ramp-up speed cap (%)
-    v_max       = 100     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
-
-    #go forward, away from the toggle
-    Time_wait   = 100   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = -30     # target distance (inches)
-    r           = -30      # target heading (degrees)
-    v_min       = 100     # ramp-up speed cap (%)
-    v_max       = 100     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
-
-    #flip toggle for the second time  
-    Time_wait   = 100   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = 5     # target distance (inches)
-    r           = -30      # target heading (degrees)
-    v_min       = 199     # ramp-up speed cap (%)
-    v_max       = 100     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
-    Time_wait   = 100   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = -30     # target distance (inches)
-    r           = -30      # target heading (degrees)
-    v_min       = 100     # ramp-up speed cap (%)
-    v_max       = 100     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
 
     #reset rotation to zero as robot is alligned with wall.
     inertialSensor.set_rotation(0, DEGREES)
-    clawRotationMotor.spin_to_position(45, wait=False)
+    wait(0.2,SECONDS)
     #go away from wall to start scoring route
-    Time_wait   = 400   # loop iteration timeout
+    Time_wait   = 350   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 14.75     # target distance (inches)
+    f           = 16     # target distance (inches)
     r           = 0      # target heading (degrees)
+    v_min       = 40     # ramp-up speed cap (%)
+    v_max       = 60     # cruise speed cap (%)
+    Kp_linear   = 4
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+
+    #raise arm to score preload
+    extension_move_to_position(1.5,100)
+    #claw_go_to_front(10)
+    
+    #face red goal to score preload
+    Time_wait   = 150   # loop iteration timeout
+    export_flag = 0      # 1 = print debug telemetry
+    f           = 0     # target distance (inches)
+    r           = 90      # target heading (degrees)
     v_min       = 50     # ramp-up speed cap (%)
     v_max       = 70     # cruise speed cap (%)
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
-    extension_move_to_position(0.3,50)
-    clawRotationMotor.set_velocity(100)
-
-    clawRotationMotor.spin_to_position(45)
-    clawRotationMotor.set_stopping(HOLD)
-    #raise arm to score preload
-    # extension_move_to_position(0.3,100)
-    clawOpen.set(False)
-    # claw_go_to_front(10)
-    
-    #face red goal to score preload
-    Time_wait   = 200   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = 0     # target distance (inches)
-    r           = 90      # target heading (degrees)
-    v_min       = 60     # ramp-up speed cap (%)
-    v_max       = 75     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
 
     #go to red goal to score preload
-    Time_wait   = 250   # loop iteration timeout
+    Time_wait   = 200   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 18     # target distance (inches)
+    f           = 25     # target distance (inches)
     r           = 90      # target heading (degrees)
     v_min       = 40     # ramp-up speed cap (%)
     v_max       = 60     # cruise speed cap (%)
@@ -886,105 +908,108 @@ def onauton_autonomous_0():
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
 
-    #use distance sensor to allign with loader vertically to score preload
-    finalize_to_front_wall(80)
-    extension_move_to_position(0,100)
+    #use distance sensor to allign with goal vertically to score preload
+    #finalize_to_front_wall(75,timeout_ms=3000,max_speed_pct=20)
     
     #scoring preload
-    wait(0.2,SECONDS)
+    extension_move_to_position(0,100,waitCon=True)
     clawOpen.set(True)
-    # wait(0.1,SECONDS)
-
+    wait(0.1,SECONDS)
+    
     #back up from red goal after scoring preload
-    Time_wait   = 300   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = -6.3     # target distance (inches)
-    r           = 90      # target heading (degrees)
-    v_min       = 50     # ramp-up speed cap (%)
-    v_max       = 70     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
-    clawRotationMotor.spin_to_position(40, wait=False)
-    clawOpen.set(True)
-    extension_move_to_position(0.1,100)
-    # turn to and drive to the cone + pin on the wall (combined turn+drive,
-    # was two separate moves -- merged to cut the standalone turn's settle time)
-    Time_wait   = 800   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = 20.5     # target distance (inches)
-    # r           = 133      # target heading (degrees)
-    r           = 142      # target heading (degrees)
-    v_min       = 10     # ramp-up speed cap (%)
-    v_max       = 15     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation,
-                           settle_error_heading=0.09, settle_loops=2)
-    wait(0.1,SECONDS)
-    # Time_wait   = 200   # loop iteration timeout
-    # export_flag = 0      # 1 = print debug telemetry
-    # f           = 12     # target distance (inches)
-    # # r           = 133      # target heading (degrees)
-    # r           = 146      # target heading (degrees)
-    # v_min       = 10     # ramp-up speed cap (%)
-    # v_max       = 20     # cruise speed cap (%)
-    # Kp_linear   = 4
-    # Kp_rotation = 30
-    # autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-    #                        Kp_linear, Kp_rotation,
-    #                        settle_error_heading=0.09, settle_loops=2)
-    clawOpen.set(False)
-    wait(0.1,SECONDS)
-
-    extension_move_to_position(0.7,100)
-    clawRotationMotor.spin_to_position(30, wait=False)
-    # clawRotationMotor.spin_to_position(40, wait=False)
-    Time_wait   = 350   # loop iteration timeout
-    export_flag = 0      # 1 = print debug telemetry
-    f           = -18.25     # target distance (inches)
-    r           = 137      # target heading (degrees)
-    v_min       = 20     # ramp-up speed cap (%)
-    v_max       = 30     # cruise speed cap (%)
-    Kp_linear   = 4
-    Kp_rotation = 30
-    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation)
     Time_wait   = 200   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 0     # target distance (inches)
+    f           = -15.5     # target distance (inches)
     r           = 90      # target heading (degrees)
     v_min       = 50     # ramp-up speed cap (%)
     v_max       = 70     # cruise speed cap (%)
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation,
-                           settle_error_heading=0.09, settle_loops=2)
-    # extension_move_to_position(0.8,100)
-    Time_wait   = 150   # loop iteration timeout (drives into wall on purpose, will always time out)
+                           Kp_linear, Kp_rotation)
+
+    #use distance sensor for more accurate back up from goal, align w/ cup and pin
+    extension_move_to_position(0.2,100,waitCon=True)
+    finalize_to_front_wall(400)
+
+    #turn to face 1st cup and pin
+    Time_wait   = 150   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 8     # target distance (inches)
-    r           = 90      # target heading (degrees)
+    f           = 0     # target distance (inches)
+    r           = 42      # target heading (degrees)
+    v_min       = 50     # ramp-up speed cap (%)
+    v_max       = 70     # cruise speed cap (%)
+    Kp_linear   = 4
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+   
+    #roughly move towards cup and pin
+    Time_wait   = 250   # loop iteration timeout
+    export_flag = 0      # 1 = print debug telemetry
+    f           = 20     # target distance (inches)
+    r           = 42      # target heading (degrees)
     v_min       = 20     # ramp-up speed cap (%)
     v_max       = 30     # cruise speed cap (%)
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
-    finalize_to_front_wall(100)
-    wait(0.1,SECONDS)
-    clawRotationMotor.spin_to_position(60, wait=False)
-    extension_move_to_position(0,100)
-    wait(0.1,SECONDS)
-    # extension_move_to_position(0.3,100)
 
-    #scoring pin + cone
-    # wait(0.1,SECONDS)
+    #rotate claw down for max tolerence when grabbing 1st cup and pin
+
+    #picking up 1st cup and pin
     clawOpen.set(True)
-    # wait(0.2,SECONDS)    
+    wait(0.1,SECONDS)
+    finalize_to_front_wall(62)
+    print("first cup pin distance sensor reading: ", distVert.object_distance(MM))
+    clawOpen.set(False)
+    
+    #raise arm to score 1st cup and pin
+    extension_move_to_position(2,100)
+
+    #go forward to allign with red goal to score 1st cup and pin
+    Time_wait   = 190   # loop iteration timeout
+    export_flag = 0      # 1 = print debug telemetry
+    f           = 7     # target distance (inches)
+    r           = 42      # target heading (degrees)
+    v_min       = 20     # ramp-up speed cap (%)
+    v_max       = 30     # cruise speed cap (%)
+    Kp_linear   = 4
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+
+    #face red goal to score 1st cup and pin
+    Time_wait   = 400   # loop iteration timeout (150 timed out mid-turn)
+    export_flag = 0      # 1 = print debug telemetry
+    f           = 0     # target distance (inches)
+    r           = 180      # target heading (degrees)
+    v_min       = 30     # ramp-up speed cap (%) (10 was too slow to turn)
+    v_max       = 30     # cruise speed cap (%)
+    Kp_linear   = 4
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+    #go fwd to goal to score 1st cup and pin
+    Time_wait   = 200   # loop iteration timeout
+    export_flag = 0      # 1 = print debug telemetry
+    f           = 25     # target distance (inches)
+    r           = 180      # target heading (degrees)
+    v_min       = 30     # ramp-up speed cap (%)
+    v_max       = 40     # cruise speed cap (%)
+    Kp_linear   = 4
+    Kp_rotation = 30
+    autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
+                           Kp_linear, Kp_rotation)
+
+    #go to goal w/ distance sensorand score to score 1st cup and pin
+    #finalize_to_front_wall(50)
+    extension_move_to_position(1.2,50,waitCon=True)
+    clawOpen.set(True)
+    wait(0.1,SECONDS)
+    
+    
     return
     #use distance sensor to align better
     finalize_to_front_wall(40)
@@ -1481,12 +1506,29 @@ def vexcode_driver_function():
 
 
 def when_started1():
-    """Runs once when the program starts (before any competition mode begins)."""
-    # Calibrate the IMU here so it's ready before autonomous begins, rather
-    # than eating into autonomous time.
+    t_1 = brain.timer.time(MSEC)
     inertialSensor.calibrate()
     while inertialSensor.is_calibrating():
         wait(100, TimeUnits.MSEC)
+    t_2 = brain.timer.time(MSEC)
+
+    # IMU calibration should take at least 1800 ms; if it was shorter,
+    # the sensor may not have settled
+    if t_2 - t_1 < 1800:
+        inertialSensor.calibrate()
+        while inertialSensor.is_calibrating():
+            wait(100, TimeUnits.MSEC)
+    """Runs once when the program starts (before any competition mode begins)."""
+    print(motorFL.temperature())
+    print(motorFR.temperature())
+    print(motorBL.temperature())
+    print(motorBR.temperature())
+    print(motorML.temperature())
+    print(motorMR.temperature())
+    print(extensionL.temperature())
+    print(extensionR.temperature()) 
+    #print(clawRotationMotor.temperature())
+    pass
 
 
 # Register driver and autonomous callbacks with the competition manager,
