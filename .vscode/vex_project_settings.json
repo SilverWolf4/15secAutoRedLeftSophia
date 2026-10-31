@@ -4,12 +4,12 @@
 		"json": 2
 	},
 	"project": {
-		"name": "T1RedRight_Sophia_8_14_26",
+		"name": "T2RedRight3_Sophia_10_14_26",
 		"description": "",
-		"creationDate": "8/14/2026, 5:20:58 PM",
+		"creationDate": "10/14/2026, 5:24:07 PM",
 		"platform": "V5",
 		"language": "python",
-		"slot": 3,
+		"slot": 4,
 		"sdkVersion": "V5_1_0_1_25",
 		"python": {
 			"main": "src/main.py"

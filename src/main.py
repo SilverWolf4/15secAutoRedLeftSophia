@@ -829,7 +829,7 @@ def onauton_autonomous_0():
     v_min       = 100     # ramp-up speed cap (%)
     v_max       = 60     # cruise speed cap (%)
     Kp_linear   = 5
-    Kp_rotation = 30
+    Kp_rotation = 35
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
 
@@ -845,7 +845,7 @@ def onauton_autonomous_0():
     # autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
     #                        Kp_linear, Kp_rotation)
 
-    #bump into wall to flip toggle for the first time    
+    #bump into wall to flip toggle for the first time
     Time_wait   = 80   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
     f           = -15     # target distance (inches)
@@ -858,9 +858,9 @@ def onauton_autonomous_0():
                            Kp_linear, Kp_rotation)
 
     #go forward, away from the toggle
-    Time_wait   = 130   # loop iteration timeout
+    Time_wait   = 80   # loop iteration timeout (was 130; it was done moving and just waiting to settle)
     export_flag = 0      # 1 = print debug telemetry
-    f           = 3     # target distance (inches)
+    f           = 4     # target distance (inches)
     r           = -40      # target heading (degrees)
     v_min       = 100     # ramp-up speed cap (%)
     v_max       = 50     # cruise speed cap (%)
@@ -869,7 +869,7 @@ def onauton_autonomous_0():
     autonomousPIDTracking([f, math.radians(r+r_offset)], v_min, v_max, Time_wait, export_flag,
                            Kp_linear, Kp_rotation)
 
-    #flip toggle for the second time  
+    #flip toggle for the second time
     Time_wait   = 70   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
     f           = -15     # target distance (inches)
@@ -888,7 +888,7 @@ def onauton_autonomous_0():
     #go away from wall to start scoring route
     Time_wait   = 350   # loop iteration timeout
     export_flag = 0      # 1 = print debug telemetry
-    f           = 16     # target distance (inches)
+    f           = 15.5     # target distance (inches)
     r           = 0      # target heading (degrees)
     v_min       = 40     # ramp-up speed cap (%)
     v_max       = 60     # cruise speed cap (%)
@@ -898,7 +898,7 @@ def onauton_autonomous_0():
                            Kp_linear, Kp_rotation)
 
     #raise arm to score preload
-    extension_move_to_position(0.8,100)
+    extension_move_to_position(0.9,100)
     #claw_go_to_front(10)
     
     #face red goal to score preload
@@ -947,8 +947,8 @@ def onauton_autonomous_0():
 
     #use distance sensor for more accurate back up from goal, align w/ cup and pin
     extension_move_to_position(0.2,100)   # runs while the robot aligns
-    finalize_to_front_wall(432)
-    # original value 432, changed to 400
+    finalize_to_front_wall(416)
+    # original value 432, changed to 416, 400
 
     #turn to face 1st cup and pin
     Time_wait   = 150   # loop iteration timeout
@@ -988,11 +988,11 @@ def onauton_autonomous_0():
     Kp_linear   = 4
     Kp_rotation = 30
     autonomousPIDTracking([f, math.radians(r)], v_min, v_max, Time_wait, export_flag,
-                           Kp_linear, Kp_rotation,use_dist_sensor=True, dist_switch_in=20.0, dist_target_mm=60,dist_max_speed_pct=30)
+                           Kp_linear, Kp_rotation,use_dist_sensor=True, dist_switch_in=20.0, dist_target_mm=50,dist_max_speed_pct=30)
     clawOpen.set(False)
     
     #raise arm to score 1st cup and pin
-    extension_move_to_position(1.1,100)
+    extension_move_to_position(1.4,100)
 
     #go forward to allign with red goal to score 1st cup and pin
     Time_wait   = 190   # loop iteration timeout
@@ -1031,7 +1031,7 @@ def onauton_autonomous_0():
 
     #go to goal w/ distance sensorand score to score 1st cup and pin
     #finalize_to_front_wall(50)
-    extension_move_to_position(1.2,50,waitCon=True)
+    extension_move_to_position(1,50,waitCon=True)
     clawOpen.set(True)
     wait(0.1,SECONDS)
     
