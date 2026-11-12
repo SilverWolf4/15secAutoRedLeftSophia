@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "test_10_1",
+    "project_name": "15secAuto",
     "target": "v5",
     "templates": {
       "LemLib": {
@@ -636,7 +636,7 @@
     },
     "upload_options": {
       "icon": "pros",
-      "slot": 8
+      "slot": 5
     },
     "use_early_access": false
   }

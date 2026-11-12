@@ -7,6 +7,7 @@ extern pros::MotorGroup left_motor_group;
 extern pros::MotorGroup right_motor_group;
 extern pros::MotorGroup slide;
 extern pros::adi::DigitalOut claw;
+extern pros::Distance distance_sensor;
 extern lemlib::Chassis chassis;
 
 //other motors
