@@ -65,20 +65,38 @@ void competition_initialize() {}
  * targetHeading: heading (degrees) to hold while driving
  * targetDist:    distance (mm) at which to stop and close the claw
  * timeout:       give up after this many ms
+ * maxTravel:     never drive more than this many inches, even if the sensor
+ *                never sees the pin (stops the robot running over it)
  */
-void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500) {
+void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500, double maxTravel = 8) {
     const double kP = 0.25;          // speed per mm of distance left
     const double kD = 0.7;           // damps the speed if closing in too fast
     const double maxSpeed = 20;      // speed when the pin is far away
     const double minSpeed = 12;      // lowest speed, so the robot doesn't stall
     const double headingKP = 2.0;    // keeps the robot driving straight
 
+    // Brake mode so the robot actually stops instead of coasting onto the pin
+    // (the motors default to coast, where brake() just cuts power)
+    left_motor_group.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+    right_motor_group.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+
+    lemlib::Pose startPose = chassis.getPose();
+    int closest = 9999;              // closest reading seen so far (mm)
     double prevError = 0;
     bool first = true;
     int start = pros::millis();
     while (pros::millis() - start < timeout) {
+        // Safety stop: driven too far, so the pin was missed or is already under the claw
+        if (chassis.getPose().distance(startPose) > maxTravel) break;
+
         int d = distance_sensor.get();          // mm (9999 if nothing seen)
         if (d <= 0 || d > 600) d = 600;         // nothing seen yet: treat as far away
+
+        // The sensor loses the pin once it is too close (it reads 9999 or the
+        // cone behind it). If we were already close and the reading jumps far
+        // away, the pin is at the claw, so stop.
+        if (closest < 150 && d > closest + 100) break;
+        if (d < closest) closest = d;
 
         double error = d - targetDist;
         if (error <= 0) break;                  // reached the pin
@@ -101,9 +119,12 @@ void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500) {
     left_motor_group.brake();
     right_motor_group.brake();
     claw.set_value(false); // close the claw
-    pros::delay(150);      // let the claw grip (was 250)
+    pros::delay(150);      // let the claw grip
     slide.move_absolute(360, 127); // lift the pin
-                         // let the claw grip
+
+    // Back to coast for the rest of the run / driver control
+    left_motor_group.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+    right_motor_group.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 }
 
 /**
@@ -150,7 +171,7 @@ void autonomous() {
 
     slide.move_absolute(600, 127);
     //first toggle
-    chassis.turnToHeading(-40, 600);
+    chassis.turnToHeading(-40, 400);
     chassis.waitUntilDone();
 
     chassis.setPose(0, 0, 0);
@@ -167,7 +188,7 @@ void autonomous() {
     
     /*going to red goal to score preload*/
     // No minSpeed, so the robot fully settles at the pose instead of exiting while still moving
-    chassis.moveToPose(18, 14, 90, 1500, {.lead = 0.4});
+    chassis.moveToPose(20, 14, 90, 1500, {.lead = 0.4});
     chassis.waitUntilDone();
 
     // Square up to 90 degrees so the push below is straight
@@ -238,7 +259,7 @@ void autonomous() {
     chassis.turnToHeading(133, 500);
     chassis.waitUntilDone();
 
-    chassis.moveToPose(48.6, 19.5, 133, 700,{.maxSpeed=70, .minSpeed=10});
+    chassis.moveToPose(48.6, 19.5, 133, 1000,{.maxSpeed=70, .minSpeed=10});
     chassis.waitUntilDone();
 
     //grabbing second ground pin
@@ -252,7 +273,7 @@ void autonomous() {
 
     //going to goal
     // Target x=30 is inside the goal (robot stops at ~x=40), so end as soon as it stalls
-    chassis.moveToPose(30, 12, 270, 1000);
+    chassis.moveToPose(30, 12, 270, 1000, {.minSpeed=70});
     waitUntilStalled();
 
     chassis.setPose(40, 13, chassis.getPose().theta);
