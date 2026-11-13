@@ -68,7 +68,7 @@ void competition_initialize() {}
  * maxTravel:     never drive more than this many inches, even if the sensor
  *                never sees the pin (stops the robot running over it)
  */
-void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500, double maxTravel = 8) {
+void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500, double maxTravel = 12) {
     const double kP = 0.25;          // speed per mm of distance left
     const double kD = 0.7;           // damps the speed if closing in too fast
     const double maxSpeed = 20;      // speed when the pin is far away
@@ -82,24 +82,32 @@ void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500, d
 
     lemlib::Pose startPose = chassis.getPose();
     int closest = 9999;              // closest reading seen so far (mm)
+    int lostSince = -1;              // when the sensor lost the pin up close (-1 = not lost)
+    const char* reason = "timeout";  // why the robot stopped (shown on the brain screen)
     double prevError = 0;
     bool first = true;
     int start = pros::millis();
     while (pros::millis() - start < timeout) {
         // Safety stop: driven too far, so the pin was missed or is already under the claw
-        if (chassis.getPose().distance(startPose) > maxTravel) break;
+        if (chassis.getPose().distance(startPose) > maxTravel) { reason = "max travel"; break; }
 
         int d = distance_sensor.get();          // mm (9999 if nothing seen)
         if (d <= 0 || d > 600) d = 600;         // nothing seen yet: treat as far away
 
         // The sensor loses the pin once it is too close (it reads 9999 or the
-        // cone behind it). If we were already close and the reading jumps far
-        // away, the pin is at the claw, so stop.
-        if (closest < 150 && d > closest + 100) break;
+        // cone behind it). Only trust that once we were nearly at the target
+        // distance, and only if the pin stays lost for 60 ms (one glitchy
+        // reading farther away was stopping the robot too early).
+        if (closest < targetDist + 30 && d > closest + 100) {
+            if (lostSince < 0) lostSince = pros::millis();
+            if (pros::millis() - lostSince > 60) { reason = "lost pin up close"; break; }
+        } else {
+            lostSince = -1;
+        }
         if (d < closest) closest = d;
 
         double error = d - targetDist;
-        if (error <= 0) break;                  // reached the pin
+        if (error <= 0) { reason = "reached pin"; break; }
 
         double derivative = first ? 0 : error - prevError;
         prevError = error;
@@ -115,6 +123,9 @@ void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500, d
         right_motor_group.move(speed - turn);
         pros::delay(10);
     }
+    pros::lcd::print(5, "grabPin %.0f: %s (closest %d mm)", targetHeading, reason, closest);
+    printf("grabPin %.0f: %s (closest %d mm)\n", targetHeading, reason, closest);
+
     // Stop the drive before closing the claw so the pin isn't pushed over
     left_motor_group.brake();
     right_motor_group.brake();
@@ -136,7 +147,7 @@ void grabPin(double targetHeading, double targetDist = 60, int timeout = 1500, d
  * stallSpeed: robot counts as stopped below this speed (inches per second)
  * stallTime:  how long it has to stay stopped before we cancel (ms)
  */
-void waitUntilStalled(int minTime = 300, double stallSpeed = 4, int stallTime = 150) {
+void waitUntilStalled(int minTime = 300, double stallSpeed = 4, int stallTime = 100) {
     int start = pros::millis();
     int stillSince = pros::millis();
     lemlib::Pose last = chassis.getPose();
@@ -164,8 +175,9 @@ void waitUntilStalled(int minTime = 300, double stallSpeed = 4, int stallTime = 
  * from where it left off.
  */
 void autonomous() {
+    int autonStart = pros::millis(); // for timing the whole run
     //set position to x:0, y:0, heading:0
-    
+
     /*toggling*/
     chassis.setPose(0, 0, 0);
 
@@ -211,7 +223,9 @@ void autonomous() {
     pros::delay(200);
     
     //backing out of red goal after scoring preload
-    chassis.moveToPoint(1, 15, 2000,{.forwards = false});
+    // Fully settle here (no minSpeed/earlyExitRange): exiting early left the robot
+    // off line and it pushed the first ground pin away
+    chassis.moveToPoint(1, 15, 1000,{.forwards = false});
     chassis.waitUntilDone();
 
     /*first ground pin*/
@@ -220,40 +234,41 @@ void autonomous() {
     chassis.waitUntilDone();
 
     // Drive fast to a point about 6" before the pin
-    chassis.moveToPose(19.3, 32.1, 48,1500,{.maxSpeed=70,.minSpeed=10});
+    chassis.moveToPose(18.1, 32.1, 48,1500,{.maxSpeed=70,.minSpeed=10});
     chassis.waitUntilDone();
     
     // Drive toward the first ground pin, slowing down as the distance sensor gets closer
     grabPin(48,60);
 
-
     // Only lift once the pin is gripped
-    slide.move_absolute(3*360, 127);
-    
-    chassis.moveToPoint(28, 39, 1500, {.maxSpeed = 80});
+    slide.move_absolute(1*360, 127);
+    chassis.moveToPoint(28, 39, 1500, {.maxSpeed = 80, .minSpeed = 20, .earlyExitRange = 2});
 
     //scoring first ground pin
     chassis.turnToHeading(180, 500);
     chassis.waitUntilDone();
+    slide.move_absolute(3*360, 127);
 
     // Robot stops against the goal before reaching the target, so end as soon as it stalls
-    chassis.moveToPose(30, 19, 180, 1000);
+    chassis.moveToPose(29, 19, 180, 1000);
     waitUntilStalled();
 
+    // Back to the original slide speed and delays: the faster version (127, 240 ms,
+    // 100 ms) made the pin fall off the goal
     slide.move_absolute(0, 100);
     pros::delay(300);
     claw.set_value(true);
-
+    return;
     /*second ground pin*/
-    pros::delay(200);
+    pros::delay(200); // let the claw fully open before backing away
+
     chassis.setPose(30,21.6,chassis.getPose().theta);
     chassis.waitUntilDone();
 
-    chassis.turnToHeading(180, 300);
-    chassis.waitUntilDone();
+    // (Removed turnToHeading(180): the robot is already square against the goal)
 
     //heading to second ground pin
-    chassis.moveToPose(30, 40, 180, 1000,{.forwards=false});
+    chassis.moveToPose(30, 40, 180, 1000,{.forwards=false, .minSpeed = 20, .earlyExitRange = 2});
     chassis.waitUntilDone();
 
     chassis.turnToHeading(133, 500);
@@ -268,12 +283,16 @@ void autonomous() {
     chassis.moveToPose(58.6, 12, 133, 1000);
     chassis.waitUntilDone();
 
-    chassis.turnToHeading(270, 400);
+    // Capped speed so the robot doesn't whip around while holding the raised pin.
+    // Timeout only 100 ms longer than before (was 400, full speed)
+    chassis.turnToHeading(270, 500, {.maxSpeed = 60});
     chassis.waitUntilDone();
 
     //going to goal
     // Target x=30 is inside the goal (robot stops at ~x=40), so end as soon as it stalls
-    chassis.moveToPose(30, 12, 270, 1000, {.minSpeed=70});
+    // Slower approach: minSpeed=70 forced it to hit the goal fast. maxSpeed caps it instead.
+    // Timeout raised a bit since it's slower; waitUntilStalled still ends it at the goal.
+    chassis.moveToPose(30, 12, 270, 1200, {.maxSpeed = 60});
     waitUntilStalled();
 
     chassis.setPose(40, 13, chassis.getPose().theta);
@@ -282,11 +301,11 @@ void autonomous() {
     //scoring second ground pin
     // Slide 80 -> 127 (~1.6x faster), so the delay is cut by the same ratio (700 -> 440)
     // to open the claw at the same slide height as before
-    slide.move_absolute(1*360, 127);
+    slide.move_absolute(1*360, 120);
     pros::delay(440);
     claw.set_value(true);
-    pros::delay(100);
-    chassis.waitUntilDone();
+    printf("auton time: %d ms\n", pros::millis() - autonStart);
+    pros::lcd::print(4, "auton time: %d ms", pros::millis() - autonStart);
     //return here for 15second auto!!!
     return;
 
